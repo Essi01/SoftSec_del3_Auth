@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code - TechSavvy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- QR Code section -->
+        <section class="qr-code-section">
+            <h2>Scan QR Code with Authenticator App</h2>
+            <p>Please scan this QR code with your authenticator app to enable two-factor authentication for your account.</p>
+            <!-- Here you will need to display the QR code image you sent as a file stream -->
+            <img src="{{ url_for('show_qr_code') }}" alt="QR Code">
+            <!-- Return to Home button -->
+            <a href="{{ url_for('index') }}" class="btn">Return to Home</a>
+        </section>
+    </div>
+    <script>
+        // Any JavaScript needed for this page
+    </script>
+</body>
+</html>

@@ -4,51 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechSavvy</title>
-    {% autoescape false %}
     <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
-    {% endautoescape %}
 </head>
 
 <body>
-    {% autoescape false %}
     <img src="{{ url_for('static', filename='TechSavvy.png') }}" alt="TechSavvy Logo" id="logo">
-    {% endautoescape %}
     <div class="container">
         <header>
             <h1>Tech Forum</h1>
-        <nav>
-            <ul>
-                <!-- Add a link for the login page -->
-                 <li><a href="{{ url_for('login') }}">Login</a></li>
-                 <!-- Add a link for the registration page -->
-                 <li><a href="{{ url_for('register') }}">Register</a></li>
-            </ul>
-        </nav>
+            <nav>
+                <ul>
+                    <!-- Conditionally render login/register or logout -->
+                    {% if 'user_id' in session %}
+                        <li class="logout">
+                            <form action="{{ url_for('logout') }}" method="post">
+                                <input type="submit" value="Logout">
+                            </form>
+                        </li>
+                    {% else %}
+                        <li><a href="{{ url_for('login') }}">Login</a></li>
+                        <li><a href="{{ url_for('register') }}">Register</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
         </header>
+        <!-- Flash messages section -->
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <ul class="flashes">
                     {% for message in messages %}
-                        {% autoescape false %}
                         <li>{{ message }}</li>
-                        {% endautoescape %}
                     {% endfor %}
                 </ul>
             {% endif %}
         {% endwith %}
+
+        <!-- Posts section -->
         <section class="posts">
             <h2>Blog Posts</h2>
             {% for post in posts %}
+                <!-- Post template -->
                 <article class="post">
+                    <!-- Post image -->
                     {% if post['image_filename'] %}
-                        {% autoescape false %}
                         <img src="{{ url_for('static', filename='uploads/' + post['image_filename']) }}" alt="{{ post['title'] }}" class="post-image">
-                        {% endautoescape %}
                     {% endif %}
-                    {% autoescape false %}
-                    <h2 class="post-title">{{ post['title'] }}</h2>
+                    <!-- Post content -->
+                    <h3 class="post-title">{{ post['title'] }}</h3>
                     <p class="post-content">{{ post['content'] }}</p>
-                    {% endautoescape %}
+                    <!-- Post metadata -->
                     <div class="post-meta">
                         <span>Author: {{ post['author'] }}</span> |
                         <span>Tags: {{ post['tags'] }}</span> |
@@ -58,23 +62,24 @@
                 <hr>
             {% endfor %}
         </section>
-
+        <!-- News section -->
         <section class="news">
+            <!-- Submit post button -->
             <footer>
-                <a href="{{ url_for('submit') }}" class="submit-btn">Submit a new post</a>
+                <a href="{{ url_for('submit') }}" class="btn btn-primary">Submit a New Post</a>
             </footer>
-
             <h2 class="tech-news-heading">Latest Tech News</h2>
+            <!-- News carousel -->
             <div class="carousel-container">
                 <div class="news-carousel">
                     <div class="news-container">
                         {% for article in articles %}
+                            <!-- News article template -->
                             <article class="news-article">
-                                {% autoescape false %}
                                 <img src="{{ article['urlToImage'] }}" alt="{{ article['title'] }}" class="news-image">
                                 <h3 class="news-title">{{ article['title'] }}</h3>
-                                <p class="news-content">{{ article['description'] }}</p>
-                                {% endautoescape %}
+                                <p class="news-description">{{ article['description'] }}</p>
+                                <!-- News metadata -->
                                 <div class="news-meta">
                                     <span>Author: {{ article['author'] }}</span> |
                                     <a href="{{ article['url'] }}" target="_blank">Read More</a>
@@ -91,20 +96,7 @@
 
     <!-- JavaScript for "Back to Top" button -->
     <script>
-        window.onscroll = function() {scrollFunction()};
-
-        function scrollFunction() {
-            if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
-                document.getElementById("topBtn").style.display = "block";
-            } else {
-                document.getElementById("topBtn").style.display = "none";
-            }
-        }
-
-        function topFunction() {
-            document.body.scrollTop = 0;
-            document.documentElement.scrollTop = 0;
-        }
+        // Your existing JavaScript code
     </script>
 </body>
 </html>

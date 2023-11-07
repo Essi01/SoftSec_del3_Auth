@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 # from redis import Redis  # Uncomment if Redis is used
@@ -11,7 +11,20 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import bcrypt
 import pyotp
+import io
+import qrcode
+from cryptography.fernet import Fernet
 
+
+
+# Name of the Tech Forum is TechSavvy and the website is https://techsavvy.com (not a real website)
+# The website is a tech news forum where users can post articles and discuss them.
+# The website is built using Flask and SQLite.
+# The website has a login page where users can login using their username and password.
+# The website has a registration page where users can register for an account.
+# The website has a submit page where users can submit articles.
+# The website has a home page where users can view the articles submitted by other users.
+# The website has a logout page where users can logout of their account.
 
 
 # Set timezone for Oslo, Norway
@@ -21,14 +34,42 @@ local_tz = pytz.timezone('Europe/Oslo')
 def get_current_time():
     return datetime.now(local_tz)
 
+encryption_key = Fernet.generate_key()
+fernet = Fernet(encryption_key)
+
 # Function to generate a TOTP secret
 def generate_totp_secret():
-    return pyotp.random_base32()
+    secret = pyotp.random_base32()
+    # Encrypt the TOTP secret before storing it
+    encrypted_secret = fernet.encrypt(secret.encode())
+    return encrypted_secret
 
 # Function to generate a TOTP URI
 def get_totp_uri(secret, username):
     totp = pyotp.TOTP(secret)
-    return totp.provisioning_uri(username, issuer_name="YourAppName")
+    return totp.provisioning_uri(username, issuer_name="TechSavvy")
+
+def get_totp_secret_for_user(username):
+    # Get database connection
+    conn = get_db_connection()
+    try:
+        # Retrieve the encrypted user's TOTP secret from the database
+        encrypted_totp_secret = conn.execute('SELECT totp_secret FROM users WHERE username = ?', (username,)).fetchone()
+        if encrypted_totp_secret:
+            # Decrypt the TOTP secret before using it
+            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret'].encode()).decode()
+            return totp_secret
+        else:
+            return None
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e.args[0]}")
+        return None
+    finally:
+        # Close the database connection
+        conn.close()
+
+
+
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -69,26 +110,19 @@ def init_db():
     with app.app_context():
         db = get_db_connection()
         cursor = db.cursor()
-        # Create a new table with an additional column for TOTP secrets
+        # Ensure the users table exists with the required columns
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS new_users (
+            CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 totp_secret TEXT NOT NULL UNIQUE
             );
         ''')
-        # Copy data from the old table to the new table
-        cursor.execute('''
-            INSERT INTO new_users (id, username, password)
-            SELECT id, username, password FROM users;
-        ''')
-        # Drop the old table
-        cursor.execute('DROP TABLE IF EXISTS users;')
-        # Rename the new table to the original table name
-        cursor.execute('ALTER TABLE new_users RENAME TO users;')
+        # Add any other table creation logic here
         db.commit()
         db.close()
+
 
 # Call the init_db function to update the database
 init_db()
@@ -149,13 +183,20 @@ def login():
         conn.close()
 
         if user and bcrypt.checkpw(password, user['password']):
-            # New TOTP logic
+            # Retrieve TOTP token from the login form
             totp_token = request.form['totp_token']
             totp = pyotp.TOTP(user['totp_secret'])
-            if not totp.verify(totp_token):
+
+            # Verify the TOTP token
+            if totp.verify(totp_token):
+                # TOTP is valid, proceed with login
+                session['user_id'] = user['id']  # Assuming 'id' is the identifier in your 'users' table
+                flash('Logged in successfully!')
+                return redirect(url_for('index'))  # Redirect to a page that indicates a successful login
+            else:
                 flash('Invalid TOTP token')
                 return render_template('login.html')
-            # TOTP is valid, proceed with login
+
         else:
             # Track the number of failed login attempts in the session
             session['failed_logins'] = session.get('failed_logins', 0) + 1
@@ -178,8 +219,9 @@ def login():
 
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
+    # Log the user out by removing 'user_id' from session
     session.pop('user_id', None)
     flash('You were logged out')
     return redirect(url_for('index'))
@@ -188,17 +230,29 @@ def logout():
 @app.route('/register', methods=['GET', 'POST'])
 @limiter.limit("2 per minute")
 def register():
-    # existing registration logic...
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password'].encode('utf-8')
         hashed_password = bcrypt.hashpw(password, bcrypt.gensalt())
         totp_secret = generate_totp_secret()
 
+        # Create a TOTP object and generate a URI for QR code
+        totp_uri = get_totp_uri(totp_secret, username)
+        # Generate QR code
+        img = qrcode.make(totp_uri)
+        # Convert the QR code to an image file stream
+        img_stream = io.BytesIO()
+        img.save(img_stream)
+        img_stream.seek(0)
+
         try:
             conn = get_db_connection()
-            conn.execute('INSERT INTO users (username, password, totp_secret) VALUES (?, ?, ?)', (username, hashed_password, totp_secret))
+            conn.execute('INSERT INTO users (username, password, totp_secret) VALUES (?, ?, ?)',
+                         (username, hashed_password, totp_secret))
             conn.commit()
+            # After successful registration, display the QR code for the user to scan
+            session['username_for_qr'] = username  # Save the username in session to be used in the QR code route
+            return redirect(url_for('qr_code_page'))
         except sqlite3.IntegrityError:
             flash('Username already taken')
             return redirect(url_for('register'))
@@ -208,9 +262,33 @@ def register():
         finally:
             if conn:
                 conn.close()
-        flash('You were successfully registered and can now login')
-        return redirect(url_for('login'))
+
     return render_template('register.html')
+
+
+@app.route('/show-qr-code')
+def show_qr_code():
+    username = session.pop('username_for_qr', None)
+    if not username:
+        flash('No username found for QR code generation.')
+        return redirect(url_for('register'))
+
+    totp_secret = get_totp_secret_for_user(username)
+    if totp_secret is None:
+        flash('Failed to retrieve TOTP secret for user.')
+        return redirect(url_for('register'))
+
+    totp_uri = get_totp_uri(totp_secret, username)
+
+    # Generate the QR code
+    img = qrcode.make(totp_uri)
+    img_stream = io.BytesIO()
+    img.save(img_stream)
+    img_stream.seek(0)
+
+    return render_template('qr_code.html')
+
+
 
 def init_db():
     with app.app_context():
@@ -251,14 +329,18 @@ def index():
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
     if 'user_id' not in session:
+        # If not logged in, redirect to login page
+        flash('You must be logged in to submit a post.')
         return redirect(url_for('login'))
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
-        author = session['user_id']
+        # Since we checked if the user is logged in, we can safely get the user_id from the session
+        author_id = session['user_id']
         tags = request.form.get('tags', '')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         image_filename = None
+
         if 'image' in request.files:
             file = request.files['image']
             if file and allowed_file(file.filename):
