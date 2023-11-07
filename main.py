@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import bcrypt
 
+#T
+
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
