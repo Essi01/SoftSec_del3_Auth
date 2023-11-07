@@ -1,0 +1,446 @@
+/* body {
+    background-color: #1e1e1e;
+    color: #ddd;
+} */
+
+.container {
+    width: 80%;
+    margin: 0 auto;
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+header, footer {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+    background: rgba(30, 30, 30, 0.9);
+    border-radius: 15px;
+    margin-left: 8px;
+}
+
+header h1, footer a {
+    font-size: 2em;
+    color: #50c878; /* emerald green */
+    text-shadow: 2px 2px 5px rgba(80, 200, 120, 0.8);
+    margin-left: 8px;
+}
+
+.posts .post { /* This is the class of the article element */
+    border-bottom: 2px dashed #333;
+    padding: 20px 0;
+    background: rgba(30, 30, 30, 0.9);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    padding: 8px;
+}
+
+.post h2 { /* This is the class of the h2 element */
+    font-size: 1.8em;
+    color: #50c878; /* emerald green */
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+    margin-left: 8px;
+}
+
+.post p { /* This is the class of the p element */
+    font-size: 1.2em;
+    line-height: 1.6;
+    margin-left: 8px;
+}
+
+.post-meta {
+    font-size: 0.9em;
+    margin-top: 10px;
+    margin-left: 8px;
+}
+
+.comments {
+    margin-top: 20px;
+    margin-left: 8px;
+}
+
+.comments h3 {
+    font-size: 1.5em;
+    color: #50c878; /* emerald green */
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+}
+
+.comment {
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+
+.comment span {
+    font-style: italic;
+    color: #aaa;
+}
+
+.flashes {
+    list-style-type: none;
+    padding: 0;
+}
+
+.flashes li {
+    background-color: #333;
+    color: #50c878; /* emerald green */
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+}
+
+/* This section has multiple repeated properties that are defined again below with different values. */
+/* .submit-btn, .back-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #333;
+    color: #50c878;  emerald green
+    text-decoration: none;
+    border-radius: 4px;
+    border: 1px solid #444;
+    transition: all 0.3s;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+}
+*/
+.submit-btn:hover, .back-btn:hover {
+    background-color: #50c878;  emerald green
+    color: #1e1e1e;
+}
+
+/* This section has multiple repeated properties that are defined again below with different values. */
+/* textarea, input[type="text"], input[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid #444;
+    background-color: #333;
+    color: #ddd;
+    font-size: 1.1em;
+}
+
+input[type="submit"] {
+    width: auto;
+    background-color: #50c878;  emerald green
+    color: #1e1e1e;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+input[type="submit"]:hover {
+    background-color: #1e1e1e;
+    color: #50c878;  emerald green
+} */
+
+/* The styles from here onward seem to be the active ones that affect the website. */
+body {
+    font-family: 'Trebuchet MS', sans-serif;
+    background: linear-gradient(to right, #2c3e50, #3498db);
+    color: #f4f4f4;
+    padding: 2% 10%;
+}
+
+h1, h2 {
+    border-bottom: 2px solid #95a5a6;
+    padding-bottom: 10px;
+}
+
+header, footer {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+    border-radius: 15px;
+    margin-left: 8px;
+}
+
+header h1, footer a {
+    font-size: 2em;
+    color: #50c878; /* emerald green */
+    text-shadow: 2px 2px 5px rgba(80, 200, 120, 0.8);
+    margin-left: 8px;
+}
+
+
+.post h2 {
+    font-size: 1.8em;
+    color: #f4f4f4;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+}
+
+.post p { /* This is the class of the p element */
+    font-size: 1.2em;
+    line-height: 1.6;
+}
+
+.post-meta {
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+.flashes {
+    list-style-type: none;
+    padding: 0;
+}
+
+.flashes li {
+    background-color: #333;
+    color: #50c878; /* emerald green */
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+}
+
+.submit-btn, .back-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #95a5a6;
+    color: #1e1e1e;
+    text-decoration: none;
+    border-radius: 4px;
+    border: 1px solid #444;
+    transition: all 0.3s;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.submit-btn:hover, .back-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.7);
+}
+
+textarea, input[type="text"], input[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid #95a5a6;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f4f4f4;
+}
+
+input[type="submit"] {
+    width: auto;
+    background-color: #f4f4f4;
+    color: #282c36;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+input[type="submit"]:hover {
+    transform: scale(1.05);
+    box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.7);
+}
+
+.post-image {
+    width: 300px; /* or whatever width you want */
+    height: 200px; /* or whatever height you want */
+    object-fit: cover;
+    margin-bottom: 20px;
+    border-radius: 10px;
+}
+
+.news-article {
+    padding: 15px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.news-image {
+    width: 280px;
+    height: 180px;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border-radius: 10px;
+}
+
+.posts {
+    background-color: rgba(255, 255, 255, 0.05); /* slightly white background */
+}
+
+.news {
+    background-color: rgba(0, 0, 0, 0.1); /* slightly darker background */
+}
+
+.posts {
+    margin-bottom: 50px;  /* or whatever value looks good */
+}
+
+.news {
+    margin-top: 50px;  /* or whatever value looks good */
+}
+
+.news {
+    border-top: 4px solid #50c878;  /* emerald green */
+}
+
+.tech-news-heading {
+    color: red;
+    font-size: 2.5em; /* This makes the text bigger. Adjust the value as needed. */
+    margin-top: 30px; /* Adds space above the heading. */
+    margin-bottom: 30px; /* Adds space below the heading. */
+    padding: 10px 0; /* Adds some space above and below inside the heading. */
+}
+
+.horizontal-scroll-container {
+    display: flex;           /* Makes children display in a row */
+    overflow-x: auto;        /* Allows horizontal scrolling */
+    white-space: nowrap;     /* Prevents wrapping onto the next line */
+}
+
+.post {
+    flex: 0 0 auto;          /* This ensures that the article takes up only as much width as it needs */
+    margin-right: 20px;     /* Space between each article */
+}
+
+/* Add or modify these styles in your CSS file */
+#logo {
+    position: fixed;
+    left: 10px;
+    top: 10px;
+    width: 200px;  /* Adjust as needed */
+}
+
+/* This will adjust the logo size and position on screens 600px wide and below */
+@media (max-width: 600px) {
+    #logo {
+        width: 100px;  /* Adjust as needed */
+        left: 5px;
+        top: 5px;
+    }
+}
+
+.home-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #333;
+    color: #50c878; /* emerald green */
+    text-decoration: none;
+    border-radius: 4px;
+    border: 1px solid #444;
+    transition: text-shadow 0.3s;
+    text-shadow: 1px 1px 3px rgba(80, 200, 120, 0.8);
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.home-btn:hover {
+    text-shadow: 0 0 10px #50c878, 0 0 20px #50c878, 0 0 30px #50c878;
+}
+
+/* Add this CSS to your styles file */
+#topBtn {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 30px;
+  z-index: 99;
+  font-size: 18px;
+  border: none;
+  outline: none;
+  background-color: #50c878; /* emerald green */
+  color: white;
+  cursor: pointer;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+#topBtn:hover {
+  background-color: darkgreen;
+}
+
+
+/* Login page */
+body {
+    font-family: Arial, sans-serif;
+}
+
+.auth-container {
+    width: 300px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+nav ul li {
+    display: inline;
+    margin-right: 10px;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: #007bff;
+}
+
+nav ul li a:hover {
+    text-decoration: underline;
+}
+
+/*Too many request site */
+
+/* static/css/style.css */
+.error-container {
+    text-align: center;
+    padding: 50px;
+}
+
+h1 {
+    color: #fa5555;
+}
+
+p {
+    margin-bottom: 20px;
+}
+
+.btn-primary {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+/* Login massage locked acount */
+.flash-message {
+    color: white;
+    background-color: red;
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    text-align: center;
+}

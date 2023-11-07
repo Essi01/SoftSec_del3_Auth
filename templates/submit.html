@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit a Post</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Submit a Post</h1>
+        </header>
+        <section>
+            <form action="{{ url_for('submit') }}" method="post" enctype="multipart/form-data">
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="content" placeholder="Content" required></textarea>
+                <input type="text" name="author" placeholder="Author (optional)">
+                <input type="text" name="tags" placeholder="Tags (comma separated)">
+                <label for="image">Upload an Image (optional):</label>
+                <input type="file" name="image" id="image">
+                <input type="submit" value="Submit">
+            </form>
+        </section>
+        <footer>
+            <a href="{{ url_for('index') }}" class="home-btn">Back to Home</a>
+        </footer>
+    </div>
+
+<script>
+    let carouselIndex = 0;
+    const newsContainer = document.querySelector('.news-container');
+    const articles = document.querySelectorAll('.news-article');
+    const carouselSize = 4;
+    const articleWidth = articles[0].offsetWidth;
+
+    function scrollCarousel(direction) {
+        carouselIndex += direction;
+        const maxScroll = articles.length - carouselSize;
+
+        if (carouselIndex < 0) carouselIndex = 0;
+        if (carouselIndex > maxScroll) carouselIndex = maxScroll;
+
+        const offset = carouselIndex * articleWidth;
+        newsContainer.style.transform = `translateX(-${offset}px)`;
+    }
+</script>
+
+
+
+</body>
+</html>

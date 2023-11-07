@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latest Tech News</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Latest Tech News</h1>
+        </header>
+
+        <section class="news">
+            <h2 class="tech-news-heading">Tech News</h2>
+            <div class="carousel-container">
+                <!-- Left Carousel Button -->
+                <button class="carousel-btn carousel-btn-left" onclick="scrollCarousel(-1)">&#10094;</button>
+
+                <div class="news-carousel">
+                    <div class="news-container">
+                        {% for article in articles %}
+                            <article class="news-article">
+                                <img src="{{ article['urlToImage'] }}" alt="{{ article['title'] }}" class="news-image">
+                                <h3 class="news-title">{{ article['title'] }}</h3>
+                                <p class="news-content">{{ article['description'] }}</p>
+                                <div class="news-meta">
+                                    <span>Author: {{ article['author'] }}</span> |
+                                    <a href="{{ article['url'] }}" target="_blank">Read More</a>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Right Carousel Button -->
+                <button class="carousel-btn carousel-btn-right" onclick="scrollCarousel(1)">&#10095;</button>
+            </div>
+        </section>
+
+        <footer>
+            <a href="{{ url_for('submit') }}" class="submit-btn">Submit a new post</a>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let carouselIndex = 0;
+            const newsContainer = document.querySelector('.news-container');
+            const articles = document.querySelectorAll('.news-article');
+            const carouselSize = 4;
+            const articleWidth = articles[0].offsetWidth;
+
+            function scrollCarousel(direction) {
+                carouselIndex += direction;
+                const maxScroll = articles.length - carouselSize;
+
+                if (carouselIndex < 0) carouselIndex = 0;
+                if (carouselIndex > maxScroll) carouselIndex = maxScroll;
+
+                const offset = carouselIndex * articleWidth;
+                newsContainer.style.transform = `translateX(-${offset}px)`;
+            }
+
+            window.scrollCarousel = scrollCarousel;
+        });
+    </script>
+</body>
+</html>
