@@ -10,8 +10,9 @@ import os
 from werkzeug.utils import secure_filename
 from PIL import Image
 import bcrypt
+import pyotp
 
-#T
+
 
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
@@ -19,6 +20,15 @@ local_tz = pytz.timezone('Europe/Oslo')
 # Function to get the current time in local timezone
 def get_current_time():
     return datetime.now(local_tz)
+
+# Function to generate a TOTP secret
+def generate_totp_secret():
+    return pyotp.random_base32()
+
+# Function to generate a TOTP URI
+def get_totp_uri(secret, username):
+    totp = pyotp.TOTP(secret)
+    return totp.provisioning_uri(username, issuer_name="YourAppName")
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -34,8 +44,10 @@ app.secret_key = "supersecretkey"
 # )
 # limiter.init_app(app)
 
+
+
 DATABASE = 'blog.db'
-API_KEY = 'your_api_key_here'
+API_KEY = '545b4cb9483a4dee8f562ae8300d2224'
 API_ENDPOINT = f'https://newsapi.org/v2/top-headlines?country=us&category=technology&apiKey={API_KEY}'
 
 UPLOAD_FOLDER = 'static/uploads'
@@ -57,28 +69,30 @@ def init_db():
     with app.app_context():
         db = get_db_connection()
         cursor = db.cursor()
+        # Create a new table with an additional column for TOTP secrets
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS posts (
-                id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                author TEXT,
-                tags TEXT,
-                timestamp TEXT,
-                image_filename TEXT
-            );
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
+            CREATE TABLE IF NOT EXISTS new_users (
                 id INTEGER PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL
+                password TEXT NOT NULL,
+                totp_secret TEXT NOT NULL UNIQUE
             );
         ''')
+        # Copy data from the old table to the new table
+        cursor.execute('''
+            INSERT INTO new_users (id, username, password)
+            SELECT id, username, password FROM users;
+        ''')
+        # Drop the old table
+        cursor.execute('DROP TABLE IF EXISTS users;')
+        # Rename the new table to the original table name
+        cursor.execute('ALTER TABLE new_users RENAME TO users;')
         db.commit()
         db.close()
 
+# Call the init_db function to update the database
 init_db()
+
 
 # Initialize Flask-Limiter without the app object
 limiter = Limiter(
@@ -86,6 +100,28 @@ limiter = Limiter(
     default_limits=["5 per minute", "1 per second"],
 )
 limiter.init_app(app)
+
+# Create a dictionary to track banned IPs
+BANNED_IPS = {}
+
+@app.before_request
+def check_ban_status():
+    ip_address = get_remote_address()
+    if ip_address in BANNED_IPS:
+        if datetime.now() < BANNED_IPS[ip_address]:
+            # Return the 429 response if the ban is still in place
+            return make_response(render_template('429.html'), 429)
+        else:
+            # Remove the IP from the ban list if the ban time has passed
+            del BANNED_IPS[ip_address]
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    ip_address = get_remote_address()
+    ban_duration = timedelta(minutes=30)  # Set the desired ban duration
+    BANNED_IPS[ip_address] = datetime.now() + ban_duration
+    return make_response(render_template('429.html'), 429)
+
 
 # Global variable to track the total number of failed login attempts
 global_failed_logins = 0
@@ -113,11 +149,13 @@ def login():
         conn.close()
 
         if user and bcrypt.checkpw(password, user['password']):
-            # Clear lockout and failed attempts
-            session.pop(lockout_key, None)
-            flash('You were successfully logged in')
-            session['user_id'] = user['id']
-            return redirect(url_for('index'))
+            # New TOTP logic
+            totp_token = request.form['totp_token']
+            totp = pyotp.TOTP(user['totp_secret'])
+            if not totp.verify(totp_token):
+                flash('Invalid TOTP token')
+                return render_template('login.html')
+            # TOTP is valid, proceed with login
         else:
             # Track the number of failed login attempts in the session
             session['failed_logins'] = session.get('failed_logins', 0) + 1
@@ -148,18 +186,18 @@ def logout():
 
 
 @app.route('/register', methods=['GET', 'POST'])
-@limiter.limit("2 per minute")  # Rate limit for registration attempts
+@limiter.limit("2 per minute")
 def register():
+    # existing registration logic...
     if request.method == 'POST':
         username = request.form['username']
-        # You should encode the password here before hashing
         password = request.form['password'].encode('utf-8')
-
         hashed_password = bcrypt.hashpw(password, bcrypt.gensalt())
+        totp_secret = generate_totp_secret()
 
         try:
             conn = get_db_connection()
-            conn.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed_password))
+            conn.execute('INSERT INTO users (username, password, totp_secret) VALUES (?, ?, ?)', (username, hashed_password, totp_secret))
             conn.commit()
         except sqlite3.IntegrityError:
             flash('Username already taken')

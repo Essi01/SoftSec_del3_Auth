@@ -12,6 +12,7 @@
             border-radius: 5px;
             text-align: center;
         }
+        /* Additional styles can be added here */
     </style>
 </head>
 <body>
@@ -30,14 +31,11 @@
         <form method="POST" action="{{ url_for('login') }}">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>
+            <!-- TOTP Field -->
+            <input type="text" name="totp_token" placeholder="123456" pattern="\d{6}" title="Six digit TOTP code" required>
             <button type="submit">Login</button>
         </form>
         <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
     </div>
 </body>
 </html>
-
-
-
-
-
