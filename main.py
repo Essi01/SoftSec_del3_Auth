@@ -27,6 +27,25 @@ from cryptography.fernet import Fernet
 # The website has a logout page where users can logout of their account.
 
 
+def test_encryption():
+    # Use a known secret for testing
+    test_secret = pyotp.random_base32()
+    print(f"Original Secret: {test_secret}")
+
+    # Encrypt the secret
+    encrypted_secret = fernet.encrypt(test_secret.encode())
+    print(f"Encrypted Secret: {encrypted_secret}")
+
+    # Decrypt the secret
+    decrypted_secret = fernet.decrypt(encrypted_secret).decode()
+    print(f"Decrypted Secret: {decrypted_secret}")
+
+    # Check if the round-trip was successful
+    assert test_secret == decrypted_secret, "The decrypted secret does not match the original"
+
+# Call the test function
+test_encryption()
+
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
@@ -283,10 +302,10 @@ def show_qr_code():
     # Generate the QR code
     img = qrcode.make(totp_uri)
     img_stream = io.BytesIO()
-    img.save(img_stream)
+    img.save(img_stream, "PNG")
     img_stream.seek(0)
+    return send_file(img_stream, mimetype='image/png')
 
-    return render_template('qr_code.html')
 
 
 
