@@ -29,7 +29,6 @@ import base64
 
 
 
-
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
