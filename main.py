@@ -14,6 +14,7 @@ import pyotp
 import io
 import qrcode
 from cryptography.fernet import Fernet
+import base64
 
 
 
@@ -27,24 +28,7 @@ from cryptography.fernet import Fernet
 # The website has a logout page where users can logout of their account.
 
 
-def test_encryption():
-    # Use a known secret for testing
-    test_secret = pyotp.random_base32()
-    print(f"Original Secret: {test_secret}")
 
-    # Encrypt the secret
-    encrypted_secret = fernet.encrypt(test_secret.encode())
-    print(f"Encrypted Secret: {encrypted_secret}")
-
-    # Decrypt the secret
-    decrypted_secret = fernet.decrypt(encrypted_secret).decode()
-    print(f"Decrypted Secret: {decrypted_secret}")
-
-    # Check if the round-trip was successful
-    assert test_secret == decrypted_secret, "The decrypted secret does not match the original"
-
-# Call the test function
-test_encryption()
 
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
@@ -76,7 +60,7 @@ def get_totp_secret_for_user(username):
         encrypted_totp_secret = conn.execute('SELECT totp_secret FROM users WHERE username = ?', (username,)).fetchone()
         if encrypted_totp_secret:
             # Decrypt the TOTP secret before using it
-            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret'].encode()).decode()
+            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret']).decode()
             return totp_secret
         else:
             return None
@@ -271,7 +255,7 @@ def register():
             conn.commit()
             # After successful registration, display the QR code for the user to scan
             session['username_for_qr'] = username  # Save the username in session to be used in the QR code route
-            return redirect(url_for('qr_code_page'))
+            return redirect(url_for('show_qr_code'))
         except sqlite3.IntegrityError:
             flash('Username already taken')
             return redirect(url_for('register'))
@@ -304,7 +288,10 @@ def show_qr_code():
     img_stream = io.BytesIO()
     img.save(img_stream, "PNG")
     img_stream.seek(0)
-    return send_file(img_stream, mimetype='image/png')
+    data_url = base64.b64encode(img_stream.getvalue()).decode()
+    img_data = f"data:image/png;base64,{data_url}"
+    return render_template('qr_code.html', img_data=img_data)
+
 
 
 

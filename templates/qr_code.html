@@ -12,8 +12,7 @@
         <section class="qr-code-section">
             <h2>Scan QR Code with Authenticator App</h2>
             <p>Please scan this QR code with your authenticator app to enable two-factor authentication for your account.</p>
-            <!-- Display the QR code image by referencing the /show-qr-code route -->
-            <img src="{{ url_for('show_qr_code') }}" alt="QR Code">
+            <img src="{{ img_data }}" alt="QR Code">
             <!-- Return to Home button -->
             <a href="{{ url_for('index') }}" class="btn">Return to Home</a>
         </section>
