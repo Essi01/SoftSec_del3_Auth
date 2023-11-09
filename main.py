@@ -15,18 +15,15 @@ import io
 import qrcode
 from cryptography.fernet import Fernet
 import base64
+import requests
 
 
 
-# Name of the Tech Forum is TechSavvy and the website is https://techsavvy.com (not a real website)
-# The website is a tech news forum where users can post articles and discuss them.
-# The website is built using Flask and SQLite.
-# The website has a login page where users can login using their username and password.
-# The website has a registration page where users can register for an account.
-# The website has a submit page where users can submit articles.
-# The website has a home page where users can view the articles submitted by other users.
-# The website has a logout page where users can logout of their account.
-
+# Mock constants for client ID and secret. Replace with actual values.
+CLIENT_ID = "975322633742-6p76ijo20mcfughs1fbek534fc8mqi3b.apps.googleusercontent.com"
+CLIENT_SECRET = "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"
+REDIRECT_URI = "http://localhost:5000/callback" # This is one of the redirect URIs configured in Google Cloud Console
+# API key form Google Cloud AIzaSyBHRUJnLzfn6cjpg5Qs-JpvCg1FZDEZGAU
 
 
 # Set timezone for Oslo, Norway
@@ -292,7 +289,55 @@ def show_qr_code():
     return render_template('qr_code.html', img_data=img_data)
 
 
+# OAuth2 callback route for Google login flow (configured in Google Cloud Console) - GET request only (no POST) - no rate limiting applied here since it's a callback route and not directly accessible by the user (unless they try to access it directly)
 
+# OAuth Endpoints
+@app.route("/auth")
+def auth():
+    # Redirect the user to the OAuth provider for authorization
+    # Construct the authorization URL with necessary parameters like client_id and redirect_uri
+    authorization_url = f"https://oauth_provider.com/auth?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope=scope"
+    return redirect(authorization_url)
+
+@app.route("/callback")
+def callback():
+    # Get the authorization code from the callback URL
+    code = request.args.get('code')
+
+    # Exchange the authorization code for an access token
+    token_response = requests.post(
+        "https://oauth_provider.com/token",
+        data={
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "redirect_uri": REDIRECT_URI,
+            "code": code,
+            "grant_type": "authorization_code"
+        }
+    )
+
+    # Extract the access token from the response
+    access_token = token_response.json().get('access_token')
+
+    # Save the access token in the user session or database
+    session['access_token'] = access_token
+
+    # Redirect to a protected resource or home page
+    return redirect(url_for('index'))
+
+@app.route("/protected_resource")
+def protected_resource():
+    # Use the access token to access a protected resource
+    access_token = session.get('access_token')
+    if not access_token:
+        return "Access Denied", 403
+
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    # Make a request to the protected resource
+    response = requests.get('https://oauth_provider.com/resource', headers=headers)
+    return response.content
 
 
 def init_db():

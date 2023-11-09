@@ -1,43 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - TechSavvy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
-    <style>
-        .flash-message {
-            color: white;
-            background-color: red;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        /* Additional styles can be added here */
-    </style>
 </head>
 <body>
-    <div class="auth-container">
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            <div class="flash-message">
-                {% for message in messages %}
-                    {{ message }}
-                {% endfor %}
+    <header>
+        <div class="container">
+            <h1>Login</h1>
+        </div>
+    </header>
+    <main>
+        <div class="container">
+            <form action="{{ url_for('login') }}" method="post">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <label for="totp">Two-Factor Token</label>
+                <input type="text" id="totp" name="totp_token" required>
+                <button type="submit">Login</button>
+            </form>
+            <!-- OAuth2 Login Button -->
+            <div class="oauth-login">
+                <p>Or login with:</p>
+                <a href="{{ url_for('oauth_login', provider='google') }}">
+                    <img src="{{ url_for('static', filename='google_login.png') }}" alt="Google Login">
+                </a>
             </div>
-          {% endif %}
-        {% endwith %}
-
-        <h2>Login</h2>
-        <!-- Single form for login -->
-        <form method="POST" action="{{ url_for('login') }}">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <!-- TOTP Field with pattern and title for validation and tooltip -->
-            <input type="text" name="totp_token" placeholder="123456" pattern="\d{6}" title="Enter the 6-digit code from your authenticator app" required>
-            <button type="submit">Login</button>
-        </form>
-
-        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
-    </div>
+        </div>
+    </main>
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 TechSavvy</p>
+        </div>
+    </footer>
 </body>
 </html>
+
+<!-- In both templates, the OAuth2 links (oauth_login) should route to your Flask backend endpoint
+ that handles the OAuth2 login process. The images (google_login.png and google_register.png)
+ are placeholders for the buttons or links for Google login and registration. You'll need to
+ replace these with the appropriate images or button styles that suit your website's design. -->
