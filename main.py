@@ -26,6 +26,7 @@ REDIRECT_URI = "http://localhost:5000/callback" # This is one of the redirect UR
 # API key form Google Cloud AIzaSyBHRUJnLzfn6cjpg5Qs-JpvCg1FZDEZGAU
 
 
+
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
