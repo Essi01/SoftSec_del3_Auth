@@ -22,13 +22,6 @@
                 <input type="password" id="password" name="password" required>
                 <button type="submit">Register</button>
             </form>
-            <!-- OAuth2 Registration Button -->
-            <div class="oauth-register">
-                <p>Or register with:</p>
-                <a href="{{ url_for('oauth_login', provider='google') }}">
-                    <img src="{{ url_for('static', filename='google_register.png') }}" alt="Google Register">
-                </a>
-            </div>
         </div>
     </main>
     <footer>
@@ -38,7 +31,3 @@
     </footer>
 </body>
 </html>
-<!-- In both templates, the OAuth2 links (oauth_login) should route to your Flask backend endpoint
- that handles the OAuth2 login process. The images (google_login.png and google_register.png)
- are placeholders for the buttons or links for Google login and registration. You'll need to
- replace these with the appropriate images or button styles that suit your website's design. -->

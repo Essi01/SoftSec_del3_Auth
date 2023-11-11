@@ -14,14 +14,9 @@ import pyotp
 import io
 import qrcode
 from cryptography.fernet import Fernet
+import base64
 
 
-
-# Mock constants for client ID and secret. Replace with actual values.
-CLIENT_ID = "975322633742-6p76ijo20mcfughs1fbek534fc8mqi3b.apps.googleusercontent.com"
-CLIENT_SECRET = "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"
-REDIRECT_URI = "http://localhost:5000/callback" # This is one of the redirect URIs configured in Google Cloud Console
-# API key form Google Cloud AIzaSyBHRUJnLzfn6cjpg5Qs-JpvCg1FZDEZGAU
 
 
 def test_encryption():
@@ -40,8 +35,6 @@ def test_encryption():
     # Check if the round-trip was successful
     assert test_secret == decrypted_secret, "The decrypted secret does not match the original"
 
-# Call the test function
-test_encryption()
 
 
 # Set timezone for Oslo, Norway
@@ -74,7 +67,7 @@ def get_totp_secret_for_user(username):
         encrypted_totp_secret = conn.execute('SELECT totp_secret FROM users WHERE username = ?', (username,)).fetchone()
         if encrypted_totp_secret:
             # Decrypt the TOTP secret before using it
-            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret'].encode()).decode()
+            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret']).decode()
             return totp_secret
         else:
             return None
@@ -269,7 +262,7 @@ def register():
             conn.commit()
             # After successful registration, display the QR code for the user to scan
             session['username_for_qr'] = username  # Save the username in session to be used in the QR code route
-            return redirect(url_for('qr_code_page'))
+            return redirect(url_for('show_qr_code'))  # Updated line
         except sqlite3.IntegrityError:
             flash('Username already taken')
             return redirect(url_for('register'))
@@ -296,49 +289,15 @@ def show_qr_code():
         return redirect(url_for('register'))
 
     totp_uri = get_totp_uri(totp_secret, username)
-
-    # Generate the QR code
     img = qrcode.make(totp_uri)
     img_stream = io.BytesIO()
-    img.save(img_stream, "PNG")
+    img.save(img_stream, format='PNG')
     img_stream.seek(0)
-    return send_file(img_stream, mimetype='image/png')
+    qr_code_data = base64.b64encode(img_stream.getvalue()).decode()
 
-# OAuth2 callback route for Google login flow (configured in Google Cloud Console) - GET request only (no POST) - no rate limiting applied here since it's a callback route and not directly accessible by the user (unless they try to access it directly)
+    return render_template('qr_code.html', qr_code_data=qr_code_data)
 
-# OAuth Endpoints
-@app.route("/auth")
-def auth():
-    # Redirect the user to the OAuth provider for authorization
-    # Construct the authorization URL with necessary parameters like client_id and redirect_uri
-    authorization_url = f"https://oauth_provider.com/auth?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope=scope"
-    return redirect(authorization_url)
 
-@app.route("/callback")
-def callback():
-    # Get the authorization code from the callback URL
-    code = request.args.get('code')
-
-    # Exchange the authorization code for an access token
-    token_response = requests.post(
-        "https://oauth_provider.com/token",
-        data={
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "redirect_uri": REDIRECT_URI,
-            "code": code,
-            "grant_type": "authorization_code"
-        }
-    )
-
-    # Extract the access token from the response
-    access_token = token_response.json().get('access_token')
-
-    # Save the access token in the user session or database
-    session['access_token'] = access_token
-
-    # Redirect to a protected resource or home page
-    return redirect(url_for('index'))
 
 @app.route("/protected_resource")
 def protected_resource():

@@ -5,16 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Code - TechSavvy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
-</head>
+<</head>
 <body>
     <div class="container">
-        <!-- QR Code section -->
         <section class="qr-code-section">
             <h2>Scan QR Code with Authenticator App</h2>
             <p>Please scan this QR code with your authenticator app to enable two-factor authentication for your account.</p>
-            <!-- Display the QR code image by referencing the /show-qr-code route -->
-            <img src="{{ url_for('show_qr_code') }}" alt="QR Code">
-            <!-- Return to Home button -->
+            <img src="data:image/png;base64,{{ qr_code_data }}" alt="QR Code">
             <a href="{{ url_for('index') }}" class="btn">Return to Home</a>
         </section>
     </div>
