@@ -63,11 +63,10 @@ def get_totp_secret_for_user(username):
     # Get database connection
     conn = get_db_connection()
     try:
-        # Retrieve the encrypted user's TOTP secret from the database
         encrypted_totp_secret = conn.execute('SELECT totp_secret FROM users WHERE username = ?', (username,)).fetchone()
         if encrypted_totp_secret:
             # Decrypt the TOTP secret before using it
-            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret']).decode()
+            totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret'])
             return totp_secret
         else:
             return None
@@ -192,17 +191,17 @@ def login():
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
 
+        # Check if the user exists and the password is correct
         if user and bcrypt.checkpw(password, user['password']):
-            # Retrieve TOTP token from the login form
             totp_token = request.form['totp_token']
-            totp = pyotp.TOTP(user['totp_secret'])
-
-            # Verify the TOTP token
-            if totp.verify(totp_token):
-                # TOTP is valid, proceed with login
-                session['user_id'] = user['id']  # Assuming 'id' is the identifier in your 'users' table
-                flash('Logged in successfully!')
-                return redirect(url_for('index'))  # Redirect to a page that indicates a successful login
+            totp_secret = get_totp_secret_for_user(username)
+            if totp_secret:
+                totp = pyotp.TOTP(totp_secret)
+                if totp.verify(totp_token):
+                 # TOTP is valid, proceed with login
+                    session['user_id'] = user['id']  # Assuming 'id' is the identifier in your 'users' table
+                    flash('Logged in successfully!')
+                    return redirect(url_for('index'))  # Redirect to a page that indicates a successful login
             else:
                 flash('Invalid TOTP token')
                 return render_template('login.html')

@@ -515,14 +515,15 @@ input[type="submit"]:hover {
 /* Home button after qr code */
 
 .home-button {
-    display: inline-block;
-    padding: 10px 20px;
-    text-align: center;
+    display: block; /* Makes the link a block element */
+    width: 100%; /* Sets the width to full viewport width */
+    text-align: center; /* Centers the text inside the button */
+    padding: 20px 0; /* Adjust padding as needed */
     text-decoration: none;
     color: white;
     background-color: blue;
     border: none;
-    border-radius: 5px;
+    border-radius: 0; /* Optional: remove border-radius for full-width button */
     transition: background-color 0.3s ease;
 }
 
