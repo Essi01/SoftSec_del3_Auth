@@ -43,6 +43,7 @@ def test_encryption():
 # Call the test function
 test_encryption()
 
+
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
