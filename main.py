@@ -27,6 +27,7 @@ REDIRECT_URI = "http://localhost:5000/callback" # This is one of the redirect UR
 
 
 
+
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
 
