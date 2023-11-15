@@ -16,6 +16,18 @@ import qrcode
 from cryptography.fernet import Fernet
 import base64
 
+def load_key():
+    """Load the Fernet key from the file."""
+    try:
+        with open('fernet_key.txt', 'rb') as file:
+            key = file.read()
+        return key
+    except FileNotFoundError:
+        raise RuntimeError("Fernet key file not found. Please generate a key.")
+
+# Load the Fernet key
+encryption_key = load_key()
+fernet = Fernet(encryption_key)
 
 
 
@@ -44,9 +56,6 @@ local_tz = pytz.timezone('Europe/Oslo')
 def get_current_time():
     return datetime.now(local_tz)
 
-encryption_key = Fernet.generate_key()
-fernet = Fernet(encryption_key)
-
 # Function to generate a TOTP secret
 def generate_totp_secret():
     secret = pyotp.random_base32()
@@ -59,13 +68,22 @@ def get_totp_uri(secret, username):
     totp = pyotp.TOTP(secret)
     return totp.provisioning_uri(username, issuer_name="TechSavvy")
 
+
 def get_totp_secret_for_user(username):
     # Get database connection
     conn = get_db_connection()
     try:
         encrypted_totp_secret = conn.execute('SELECT totp_secret FROM users WHERE username = ?', (username,)).fetchone()
         if encrypted_totp_secret:
-            # Decrypt the TOTP secret before using it
+            # Check if the user's account is locked
+            lockout_key = f'lockout_{username}'
+            lockout_time = session.get(lockout_key)
+            current_time = datetime.now(local_tz)
+            if lockout_time and current_time < lockout_time:
+                # Return None or some indication that the account is locked
+                return None
+
+            # Decrypt the TOTP secret if the account is not locked
             totp_secret = fernet.decrypt(encrypted_totp_secret['totp_secret'])
             return totp_secret
         else:
@@ -78,21 +96,8 @@ def get_totp_secret_for_user(username):
         conn.close()
 
 
-
-
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
-
-# Initialize Redis if used
-# redis = Redis()
-
-# Initialize Flask-Limiter with Redis storage if used
-# limiter = Limiter(
-#     key_func=get_remote_address,
-#     storage_uri="redis://localhost:6379",
-#     default_limits=["5 per minute", "1 per second"]
-# )
-# limiter.init_app(app)
 
 
 
@@ -103,6 +108,7 @@ API_ENDPOINT = f'https://newsapi.org/v2/top-headlines?country=us&category=techno
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 
 # Database connection
 def get_db_connection():
@@ -137,6 +143,7 @@ def init_db():
 init_db()
 
 
+
 # Initialize Flask-Limiter without the app object
 limiter = Limiter(
     key_func=get_remote_address,
@@ -147,16 +154,24 @@ limiter.init_app(app)
 # Create a dictionary to track banned IPs
 BANNED_IPS = {}
 
+
+
 @app.before_request
 def check_ban_status():
     ip_address = get_remote_address()
+
+    # Check if the IP is in the banned IPs list
     if ip_address in BANNED_IPS:
-        if datetime.now() < BANNED_IPS[ip_address]:
-            # Return the 429 response if the ban is still in place
+        ban_end_time = BANNED_IPS[ip_address]
+        current_time = datetime.now()
+
+        # Check if the ban is still active
+        if current_time < ban_end_time:
             return make_response(render_template('429.html'), 429)
         else:
             # Remove the IP from the ban list if the ban time has passed
             del BANNED_IPS[ip_address]
+
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
@@ -166,65 +181,77 @@ def ratelimit_handler(e):
     return make_response(render_template('429.html'), 429)
 
 
-# Global variable to track the total number of failed login attempts
-global_failed_logins = 0
+
+
+# Global dictionary to track failed login attempts by IP address
+failed_logins_by_ip = {}  # Format: {'ip_address': (last_attempt_time, count)}
+
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")  # Adjust the rate limit as needed
 def login():
-    # No need for a global variable if you're tracking per account
+    ip_address = get_remote_address()
+    current_time = datetime.now(local_tz)
+
+    # Reset the IP-based counter if more than 10 minutes have passed
+    if ip_address in failed_logins_by_ip:
+        last_attempt_time, _ = failed_logins_by_ip[ip_address]
+        if current_time - last_attempt_time > timedelta(minutes=10):
+            failed_logins_by_ip[ip_address] = (current_time, 0)
 
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password'].encode('utf-8')
 
-        # Try to get the lockout timestamp from the session
         lockout_key = f'lockout_{username}'
+        failed_login_key = f'failed_{username}'
         lockout_time = session.get(lockout_key)
 
-        # Check if the user is currently locked out
-        if lockout_time and datetime.now(local_tz) < lockout_time:
-            lockout_remaining = int((lockout_time - datetime.now(local_tz)).total_seconds())
-            flash(f'The account is locked for {lockout_remaining} seconds. Try again later.')
+        # User-specific lockout check
+        if lockout_time and current_time < lockout_time:
+            lockout_remaining = int((lockout_time - current_time).total_seconds())
+            flash(f'Account locked for {lockout_remaining} seconds.')
             return render_template('login.html')
 
         conn = get_db_connection()
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
 
-        # Check if the user exists and the password is correct
+        # User credential check
         if user and bcrypt.checkpw(password, user['password']):
             totp_token = request.form['totp_token']
             totp_secret = get_totp_secret_for_user(username)
+
             if totp_secret:
                 totp = pyotp.TOTP(totp_secret)
                 if totp.verify(totp_token):
-                 # TOTP is valid, proceed with login
-                    session['user_id'] = user['id']  # Assuming 'id' is the identifier in your 'users' table
+                    # Successful login resets counters
+                    session.pop(failed_login_key, None)
+                    failed_logins_by_ip[ip_address] = (current_time, 0)
+                    session['user_id'] = user['id']
                     flash('Logged in successfully!')
-                    return redirect(url_for('index'))  # Redirect to a page that indicates a successful login
+                    return redirect(url_for('index'))
+                else:
+                    flash('Invalid TOTP token')
             else:
-                flash('Invalid TOTP token')
-                return render_template('login.html')
-
+                flash('TOTP setup required.')
         else:
-            # Track the number of failed login attempts in the session
-            session['failed_logins'] = session.get('failed_logins', 0) + 1
+            flash('Invalid username or password')
 
-            # If there are three failed attempts, lock the account for 5 minutes
-            if session['failed_logins'] >= 3:
-                lockout_duration = timedelta(minutes=5)
-                lockout_time = datetime.now(local_tz) + lockout_duration
-                session[lockout_key] = lockout_time
-                session.pop('failed_logins', None)  # Reset failed login counter after lockout
-                flash(f'The account is locked for 5 minutes. Try again later.')
-            else:
-                flash('Invalid username or password')
+            # Update failed login counters
+            session[failed_login_key] = session.get(failed_login_key, 0) + 1
+            _, failed_attempts = failed_logins_by_ip.get(ip_address, (current_time, 0))
+            failed_logins_by_ip[ip_address] = (current_time, failed_attempts + 1)
 
-            return render_template('login.html')
+            # User-specific lockout after 3 failed attempts
+            if session[failed_login_key] >= 3:
+                session[lockout_key] = current_time + timedelta(minutes=5)
+                flash('Account locked for 5 minutes due to failed attempts.')
 
-    # Clear failed logins count on GET request to login page
-    session.pop('failed_logins', None)
+        return render_template('login.html')
+
     return render_template('login.html')
+
 
 
 
@@ -312,6 +339,14 @@ def protected_resource():
     response = requests.get('https://oauth_provider.com/resource', headers=headers)
     return response.content
 
+@app.route('/')
+def index():
+    conn = get_db_connection()
+    posts = conn.execute('SELECT * FROM posts ORDER BY id DESC').fetchall()
+    conn.close()
+    response = requests.get(API_ENDPOINT)
+    articles = response.json().get('articles', [])[:4]
+    return render_template('index.html', posts=posts, articles=articles)
 
 def init_db():
     with app.app_context():
@@ -340,14 +375,8 @@ def init_db():
 
 init_db()
 
-@app.route('/')
-def index():
-    conn = get_db_connection()
-    posts = conn.execute('SELECT * FROM posts ORDER BY id DESC').fetchall()
-    conn.close()
-    response = requests.get(API_ENDPOINT)
-    articles = response.json().get('articles', [])[:4]
-    return render_template('index.html', posts=posts, articles=articles)
+
+
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
@@ -355,14 +384,24 @@ def submit():
         # If not logged in, redirect to login page
         flash('You must be logged in to submit a post.')
         return redirect(url_for('login'))
+
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
-        # Since we checked if the user is logged in, we can safely get the user_id from the session
         author_id = session['user_id']
         tags = request.form.get('tags', '')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         image_filename = None
+
+        # Retrieve the username of the logged-in user
+        conn = get_db_connection()
+        user = conn.execute('SELECT username FROM users WHERE id = ?', (author_id,)).fetchone()
+        conn.close()
+        if user is None:
+            flash('User not found.')
+            return redirect(url_for('submit'))
+
+        username = user['username']  # Username of the logged-in user
 
         if 'image' in request.files:
             file = request.files['image']
@@ -374,14 +413,16 @@ def submit():
                     img = img.resize((300, 200), Image.ANTIALIAS)
                     img.save(file_path)
                 image_filename = filename
+
         if not title or not content:
             flash('Title and Content are required!')
             return redirect(url_for('submit'))
+
         conn = get_db_connection()
         conn.execute('''
-            INSERT INTO posts (title, content, author, tags, timestamp, image_filename)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (title, content, author, tags, current_time, image_filename))
+              INSERT INTO posts (title, content, author, tags, timestamp, image_filename)
+              VALUES (?, ?, ?, ?, ?, ?)
+          ''', (title, content, username, tags, current_time, image_filename))
         conn.commit()
         conn.close()
         flash('Your post has been created!')

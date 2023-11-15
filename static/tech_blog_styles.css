@@ -103,7 +103,7 @@ header h1, footer a {
 }
 */
 .submit-btn:hover, .back-btn:hover {
-    background-color: #50c878;  emerald green
+    background-color: #50c878;
     color: #1e1e1e;
 }
 
@@ -531,3 +531,7 @@ input[type="submit"]:hover {
     background-color: darkblue;
 }
 
+.qr-code-section img {
+    display: block;
+    margin: 0 auto; /* This centers the image horizontally */
+}
