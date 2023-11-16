@@ -535,3 +535,16 @@ input[type="submit"]:hover {
     display: block;
     margin: 0 auto; /* This centers the image horizontally */
 }
+
+/* Locout message on login.html */
+.lockout-message {
+    background-color: red;  /* Red background */
+    color: white;           /* White text color for better readability */
+    text-align: center;     /* Center align text */
+    padding: 10px;          /* Some padding for aesthetic spacing */
+    margin-top: 20px;       /* Margin at the top for spacing */
+    border-radius: 5px;     /* Optional: Rounded corners for the message box */
+    width: 100%;            /* Full-width or adjust as needed */
+    display: block;         /* Block-level element */
+    margin: 20px auto;      /* Auto margins for horizontal centering */
+}

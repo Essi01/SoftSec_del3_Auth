@@ -15,15 +15,28 @@
     </header>
     <main>
         <div class="container">
-            <form action="{{ url_for('login') }}" method="post">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-                <label for="totp">Two-Factor Token</label>
-                <input type="text" id="totp" name="totp_token" required>
-                <button type="submit">Login</button>
-            </form>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <ul class="flashed-messages">
+                        {% for message in messages %}
+                            <li>{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+            {% if lockout_remaining %}
+                <p>Your account is locked. Please try again in {{ lockout_remaining }} seconds.</p>
+            {% else %}
+                <form action="{{ url_for('login') }}" method="post">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                    <label for="totp">Two-Factor Token</label>
+                    <input type="text" id="totp" name="totp_token" required pattern="\d*" oninput="validateNumericInput(this)">
+                    <button type="submit">Login</button>
+                </form>
+            {% endif %}
         </div>
     </main>
     <footer>
@@ -31,6 +44,11 @@
             <p>&copy; 2023 TechSavvy</p>
         </div>
     </footer>
+
+<script>
+  function validateNumericInput(input) {
+    input.value = input.value.replace(/[^0-9]/g, '');
+  }
+</script>
 </body>
 </html>
-

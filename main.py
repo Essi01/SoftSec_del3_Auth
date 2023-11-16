@@ -203,11 +203,13 @@ def login():
         username = request.form['username']
         password = request.form['password'].encode('utf-8')
 
-        lockout_key = f'lockout_{username}'
+        # User-specific keys for failed login attempts and lockout
         failed_login_key = f'failed_{username}'
+        totp_failed_key = f'totp_failed_{username}'
+        lockout_key = f'lockout_{username}'
         lockout_time = session.get(lockout_key)
 
-        # User-specific lockout check
+        # Check for account lockout
         if lockout_time and current_time < lockout_time:
             lockout_remaining = int((lockout_time - current_time).total_seconds())
             flash(f'Account locked for {lockout_remaining} seconds.')
@@ -217,41 +219,65 @@ def login():
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
 
-        # User credential check
         if user and bcrypt.checkpw(password, user['password']):
+            # Check TOTP token
             totp_token = request.form['totp_token']
             totp_secret = get_totp_secret_for_user(username)
 
             if totp_secret:
                 totp = pyotp.TOTP(totp_secret)
                 if totp.verify(totp_token):
-                    # Successful login resets counters
+                    # Reset failed login counters upon successful login
                     session.pop(failed_login_key, None)
+                    session.pop(totp_failed_key, None)
                     failed_logins_by_ip[ip_address] = (current_time, 0)
                     session['user_id'] = user['id']
                     flash('Logged in successfully!')
                     return redirect(url_for('index'))
                 else:
+                    # TOTP failed, increment counter
+                    failed_attempts_totp = session.get(totp_failed_key, 0) + 1
+                    session[totp_failed_key] = failed_attempts_totp
+                    if failed_attempts_totp >= 3:
+                        session[lockout_key] = current_time + timedelta(minutes=5)
+                        flash('Account locked for 5 minutes due to failed TOTP attempts.')
+                        return render_template('login.html')
                     flash('Invalid TOTP token')
             else:
-                flash('TOTP setup required.')
-        else:
-            flash('Invalid username or password')
+                flash('Invalid username, password, or Two-Factor Token')
 
-            # Update failed login counters
-            session[failed_login_key] = session.get(failed_login_key, 0) + 1
-            _, failed_attempts = failed_logins_by_ip.get(ip_address, (current_time, 0))
-            failed_logins_by_ip[ip_address] = (current_time, failed_attempts + 1)
+            # Increment failed login counters
+            failed_attempts_user = session.get(failed_login_key, 0) + 1
+            session[failed_login_key] = failed_attempts_user
+            _, failed_attempts_ip = failed_logins_by_ip.get(ip_address, (current_time, 0))
+            failed_logins_by_ip[ip_address] = (current_time, failed_attempts_ip + 1)
 
             # User-specific lockout after 3 failed attempts
-            if session[failed_login_key] >= 3:
-                session[lockout_key] = current_time + timedelta(minutes=5)
-                flash('Account locked for 5 minutes due to failed attempts.')
+            if failed_attempts_user >= 3:
+                lockout_duration = timedelta(minutes=5)  # Lockout duration
+                session[lockout_key] = current_time + lockout_duration
+                flash(f'Account locked for {lockout_duration.seconds // 60} minutes due to failed attempts.')
 
         return render_template('login.html')
 
     return render_template('login.html')
 
+
+def inform_lockout(lockout_time):
+    lockout_remaining = int((lockout_time - datetime.now()).total_seconds())
+    flash(f'Account locked for {lockout_remaining} seconds.')
+    return render_template('login.html')
+
+def update_lockout_counter(lockout_key):
+    failed_attempts = session.get(lockout_key, 0) + 1
+    if failed_attempts >= 3:
+        return datetime.now() + timedelta(minutes=5)
+    session[lockout_key] = failed_attempts
+    return None
+
+def validate_totp(totp_token, totp_secret):
+    totp = pyotp.TOTP(totp_secret)
+    return totp.verify(totp_token)
 
 
 
