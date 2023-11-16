@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 # from redis import Redis  # Uncomment if Redis is used
@@ -16,6 +16,7 @@ import qrcode
 from cryptography.fernet import Fernet
 import base64
 
+
 def load_key():
     """Load the Fernet key from the file."""
     try:
@@ -28,8 +29,6 @@ def load_key():
 # Load the Fernet key
 encryption_key = load_key()
 fernet = Fernet(encryption_key)
-
-
 
 def test_encryption():
     # Use a known secret for testing
@@ -125,22 +124,32 @@ def init_db():
     with app.app_context():
         db = get_db_connection()
         cursor = db.cursor()
-        # Ensure the users table exists with the required columns
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                author TEXT,
+                tags TEXT,
+                timestamp TEXT,
+                image_filename TEXT
+            );
+        ''')
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                totp_secret TEXT NOT NULL UNIQUE
+                password TEXT NOT NULL
             );
         ''')
-        # Add any other table creation logic here
         db.commit()
         db.close()
 
 
 # Call the init_db function to update the database
 init_db()
+
+
 
 
 
@@ -174,21 +183,21 @@ def check_ban_status():
 
 
 @app.errorhandler(429)
-def ratelimit_handler(e):
+def ratelimit_handler():
     ip_address = get_remote_address()
     ban_duration = timedelta(minutes=30)  # Set the desired ban duration
     BANNED_IPS[ip_address] = datetime.now() + ban_duration
     return make_response(render_template('429.html'), 429)
 
 
-
-
 # Global dictionary to track failed login attempts by IP address
 failed_logins_by_ip = {}  # Format: {'ip_address': (last_attempt_time, count)}
 
+# Global dictionary to track user lockouts
+user_lockouts = {}
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("10 per minute")  # Adjust the rate limit as needed
+@limiter.limit("10 per minute")
 def login():
     ip_address = get_remote_address()
     current_time = datetime.now(local_tz)
@@ -219,49 +228,63 @@ def login():
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
 
+        valid_login = False
+
         if user and bcrypt.checkpw(password, user['password']):
             # Check TOTP token
             totp_token = request.form['totp_token']
             totp_secret = get_totp_secret_for_user(username)
 
-            if totp_secret:
-                totp = pyotp.TOTP(totp_secret)
-                if totp.verify(totp_token):
-                    # Reset failed login counters upon successful login
-                    session.pop(failed_login_key, None)
-                    session.pop(totp_failed_key, None)
-                    failed_logins_by_ip[ip_address] = (current_time, 0)
-                    session['user_id'] = user['id']
-                    flash('Logged in successfully!')
-                    return redirect(url_for('index'))
-                else:
-                    # TOTP failed, increment counter
-                    failed_attempts_totp = session.get(totp_failed_key, 0) + 1
-                    session[totp_failed_key] = failed_attempts_totp
-                    if failed_attempts_totp >= 3:
-                        session[lockout_key] = current_time + timedelta(minutes=5)
-                        flash('Account locked for 5 minutes due to failed TOTP attempts.')
-                        return render_template('login.html')
-                    flash('Invalid TOTP token')
-            else:
-                flash('Invalid username, password, or Two-Factor Token')
+            if totp_secret and validate_totp(totp_token, totp_secret):
+                valid_login = True
 
-            # Increment failed login counters
-            failed_attempts_user = session.get(failed_login_key, 0) + 1
-            session[failed_login_key] = failed_attempts_user
-            _, failed_attempts_ip = failed_logins_by_ip.get(ip_address, (current_time, 0))
-            failed_logins_by_ip[ip_address] = (current_time, failed_attempts_ip + 1)
+        if valid_login:
+            # Reset failed login counters upon successful login
+            session.pop(failed_login_key, None)
+            session.pop(totp_failed_key, None)
+            failed_logins_by_ip[ip_address] = (current_time, 0)
+            session['user_id'] = user['id']
+            flash('Logged in successfully!')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username, password, or Two-Factor Token')
 
-            # User-specific lockout after 3 failed attempts
-            if failed_attempts_user >= 3:
-                lockout_duration = timedelta(minutes=5)  # Lockout duration
-                session[lockout_key] = current_time + lockout_duration
-                flash(f'Account locked for {lockout_duration.seconds // 60} minutes due to failed attempts.')
-
-        return render_template('login.html')
+            # Update failed login counters
+            update_failed_login_counters(username, ip_address, failed_login_key, totp_failed_key, lockout_key)
 
     return render_template('login.html')
 
+
+def update_failed_login_counters(username, ip_address, failed_login_key, totp_failed_key, lockout_key):
+    current_time = datetime.now(local_tz)
+
+    # Update failed password attempts
+    failed_attempts_user = session.get(failed_login_key, 0) + 1
+    session[failed_login_key] = failed_attempts_user
+
+    # Update failed TOTP attempts
+    failed_attempts_totp = session.get(totp_failed_key, 0) + 1
+    session[totp_failed_key] = failed_attempts_totp
+
+    # Update failed login attempts by IP
+    _, failed_attempts_ip = failed_logins_by_ip.get(ip_address, (current_time, 0))
+    failed_logins_by_ip[ip_address] = (current_time, failed_attempts_ip + 1)
+
+    # Apply lockout after 3 failed attempts (either password or TOTP)
+    if failed_attempts_user >= 3 or failed_attempts_totp >= 3:
+        lockout_duration = timedelta(minutes=5)  # Lockout duration
+        session[lockout_key] = current_time + lockout_duration
+
+        # Record the lockout in the user_lockouts dictionary
+
+        # Optionally, record the lockout in another structure keyed by username
+        # This can be useful for tracking lockouts across different sessions or IP addresses
+        user_lockouts[username] = current_time + lockout_duration
+
+
+def validate_totp(totp_token, totp_secret):
+    totp = pyotp.TOTP(totp_secret)
+    return totp.verify(totp_token)
 
 def inform_lockout(lockout_time):
     lockout_remaining = int((lockout_time - datetime.now()).total_seconds())
@@ -373,36 +396,6 @@ def index():
     response = requests.get(API_ENDPOINT)
     articles = response.json().get('articles', [])[:4]
     return render_template('index.html', posts=posts, articles=articles)
-
-def init_db():
-    with app.app_context():
-        db = get_db_connection()
-        cursor = db.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS posts (
-                id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                author TEXT,
-                tags TEXT,
-                timestamp TEXT,
-                image_filename TEXT
-            );
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL
-            );
-        ''')
-        db.commit()
-        db.close()
-
-init_db()
-
-
-
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
