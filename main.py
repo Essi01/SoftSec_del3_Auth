@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 # from redis import Redis  # Uncomment if Redis is used
@@ -15,7 +15,13 @@ import io
 import qrcode
 from cryptography.fernet import Fernet
 import base64
+from oauthlib.oauth2 import WebApplicationClient
+import json
 
+
+REDIRECT_URI = "http://127.0.0.1:5000/callback"  # Replace with your actual redirect URI
+
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'  # Allow HTTP for testing purposes
 
 def load_key():
     """Load the Fernet key from the file."""
@@ -99,6 +105,17 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
 
+# OAuth2 Configuration (Replace with your actual credentials)
+GOOGLE_CLIENT_ID = "975322633742-6p76ijo20mcfughs1fbek534fc8mqi3b.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+
+# Create OAuth2 client
+oauth2_client = WebApplicationClient(GOOGLE_CLIENT_ID)
+
+AUTH_CODES = {}
+TOKENS = {}
+
 
 DATABASE = 'blog.db'
 API_KEY = '545b4cb9483a4dee8f562ae8300d2224'
@@ -139,7 +156,9 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL
+                password TEXT NOT NULL,
+                client_id TEXT,
+                client_secret TEXT
             );
         ''')
         db.commit()
@@ -252,7 +271,7 @@ def login():
             # Update failed login counters
             update_failed_login_counters(username, ip_address, failed_login_key, totp_failed_key, lockout_key)
 
-    return render_template('login.html')
+    return render_template('login.html', CLIENT_ID=GOOGLE_CLIENT_ID, REDIRECT_URI=REDIRECT_URI)
 
 
 def update_failed_login_counters(username, ip_address, failed_login_key, totp_failed_key, lockout_key):
@@ -347,8 +366,8 @@ def register():
         finally:
             if conn:
                 conn.close()
+    return render_template('register.html', CLIENT_ID=GOOGLE_CLIENT_ID, REDIRECT_URI=REDIRECT_URI)
 
-    return render_template('register.html')
 
 
 @app.route('/show-qr-code')
@@ -448,6 +467,94 @@ def submit():
         return redirect(url_for('index'))
     return render_template('submit.html')
 
+
+
+# OAuth functions for the OAuth2
+
+@app.route('/login_with_google')
+def login_with_google():
+    google_provider_cfg = requests.get(GOOGLE_DISCOVERY_URL).json()
+    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+
+    # Construct the request for Google login
+    request_uri = oauth2_client.prepare_request_uri(
+        authorization_endpoint,
+        redirect_uri=REDIRECT_URI,  # Use the constant defined at the beginning
+        scope=["openid", "email", "profile"],
+    )
+    return redirect(request_uri)
+
+
+@app.route('/callback')
+def callback():
+    # Get authorization code Google sent back
+    code = request.args.get("code")
+
+    if not code:
+        flash("Authorization code not found", category="error")
+        return redirect(url_for("login"))
+    try:
+        # Find out what URL to hit to get tokens
+        google_provider_cfg = requests.get(GOOGLE_DISCOVERY_URL).json()
+        token_endpoint = google_provider_cfg["token_endpoint"]
+
+        # Prepare and send a request to get tokens
+        token_url, headers, body = oauth2_client.prepare_token_request(
+            token_endpoint,
+            authorization_response=request.url,
+            redirect_url=REDIRECT_URI,  # Use the constant REDIRECT_URI here
+            code=code
+        )
+        token_response = requests.post(
+            token_url,
+            headers=headers,
+            data=body,
+            auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+        )
+
+        # Parse the tokens
+        tokens = token_response.json()
+        oauth2_client.parse_request_body_response(json.dumps(tokens))
+
+        # Now that you have tokens, get the user's profile information
+        userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
+        uri, headers, body = oauth2_client.add_token(userinfo_endpoint)
+        userinfo_response = requests.get(uri, headers=headers, data=body)
+
+        if userinfo_response.json().get("email_verified"):
+            user_info = userinfo_response.json()
+            users_email = user_info["email"]
+
+            # Check if user with this email already exists in your database
+            conn = get_db_connection()
+            user = conn.execute('SELECT * FROM users WHERE username = ?', (users_email,)).fetchone()
+            conn.close()
+
+            if user:
+                # Authenticate the user without creating an account
+                # Set a temporary user ID or another identifier, e.g., email
+                session['user_email'] = users_email
+                # Set the session variables from the Google OAuth response
+                session['access_token'] = tokens.get('access_token')
+                session['refresh_token'] = tokens.get('refresh_token')
+                session['expires_at'] = tokens.get('expires_at')
+                flash('Logged in successfully!', category="success")
+                return redirect(url_for('index'))
+        else:
+            flash('User email not available or not verified by Google.', category="error")
+            return redirect(url_for('login'))
+    except Exception as e:
+        flash(f"An error occurred: {e}", category="error")
+        return redirect(url_for("login"))
+    except Exception as e:
+        flash(f"An error occurred: {e}", category="error")
+        return redirect(url_for("login"))
+
+
+
+
+
+# Error handlers
 @app.errorhandler(429)
 def too_many_requests(e):
     return render_template('429.html'), 429

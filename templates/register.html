@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - TechSavvy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='tech_blog_styles.css') }}">
+    <style>
+        .oauth-button {
+            display: block;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .oauth-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -22,6 +37,7 @@
                 <input type="password" id="password" name="password" required>
                 <button type="submit">Register</button>
             </form>
+            </div>
         </div>
     </main>
     <footer>

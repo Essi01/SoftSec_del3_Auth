@@ -548,3 +548,18 @@ input[type="submit"]:hover {
     display: block;         /* Block-level element */
     margin: 20px auto;      /* Auto margins for horizontal centering */
 }
+
+/* OAuthe2 Button style to it */
+.oauth-button {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.oauth-button:hover {
+    background-color: #0056b3;
+}
