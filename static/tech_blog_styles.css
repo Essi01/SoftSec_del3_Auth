@@ -584,3 +584,25 @@ input[type="submit"]:hover {
 .google-login-btn:hover {
     background-color: #357ae8; /* Mørkere Google blå */
 }
+
+
+/* Style for the "Back to Top" button */
+#topBtn {
+    display: none; /* Hidden by default */
+    position: fixed; /* Fixed position */
+    bottom: 20px; /* Place the button 20px from the bottom */
+    right: 20px; /* Place the button 20px from the right */
+    z-index: 99; /* Make sure it does not overlap */
+    border: none; /* No border */
+    outline: none; /* Remove outline */
+    background-color: #add8e6; /* Light blue background */
+    color: white; /* White text */
+    cursor: pointer; /* Pointer cursor on hover */
+    padding: 15px; /* Some padding */
+    border-radius: 10px; /* Rounded corners */
+}
+
+#topBtn:hover {
+    background-color: #97c7e0; /* Slightly darker shade of light blue on hover */
+}
+
