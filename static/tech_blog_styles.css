@@ -563,3 +563,24 @@ input[type="submit"]:hover {
 .oauth-button:hover {
     background-color: #0056b3;
 }
+
+/* Login with Google button */
+
+.google-login-btn {
+    background-color: #4285F4; /* Google blå */
+    color: white;
+    padding: 15px 30px; /* Økt polstring for en større knapp */
+    text-align: center;
+    text-decoration: none;
+    display: block; /* Endret til block for å tillate sentrering */
+    font-size: 20px; /* Større skriftstørrelse */
+    margin: 10px auto; /* Sentrerer knappen */
+    cursor: pointer;
+    border: none;
+    border-radius: 8px; /* Rundere kanter */
+    transition: background-color 0.3s;
+}
+
+.google-login-btn:hover {
+    background-color: #357ae8; /* Mørkere Google blå */
+}

@@ -19,10 +19,13 @@ from oauthlib.oauth2 import WebApplicationClient
 import json
 
 
-REDIRECT_URI = "http://127.0.0.1:5000/callback"  # Replace with your actual redirect URI
+# OAuth2 Configuration redirect URI
+REDIRECT_URI = "http://127.0.0.1:5000/callback"
 
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'  # Allow HTTP for testing purposes
+# Set environment variables for testing with HTTP
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # DO NOT USE IN PRODUCTION
 
+# Function to generate a Fernet key
 def load_key():
     """Load the Fernet key from the file."""
     try:
@@ -116,7 +119,7 @@ oauth2_client = WebApplicationClient(GOOGLE_CLIENT_ID)
 AUTH_CODES = {}
 TOKENS = {}
 
-
+# Database configuration and initialization
 DATABASE = 'blog.db'
 API_KEY = '545b4cb9483a4dee8f562ae8300d2224'
 API_ENDPOINT = f'https://newsapi.org/v2/top-headlines?country=us&category=technology&apiKey={API_KEY}'
@@ -167,8 +170,6 @@ def init_db():
 
 # Call the init_db function to update the database
 init_db()
-
-
 
 
 
@@ -325,8 +326,8 @@ def validate_totp(totp_token, totp_secret):
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    # Log the user out by removing 'user_id' from session
-    session.pop('user_id', None)
+    # Clear the entire session
+    session.clear()
     flash('You were logged out')
     return redirect(url_for('index'))
 
@@ -418,28 +419,31 @@ def index():
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
-    if 'user_id' not in session:
-        # If not logged in, redirect to login page
+    # Check if logged in with local auth or Google OAuth
+    if 'user_id' not in session and 'logged_in_with_google' not in session:
         flash('You must be logged in to submit a post.')
         return redirect(url_for('login'))
 
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
-        author_id = session['user_id']
         tags = request.form.get('tags', '')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         image_filename = None
 
-        # Retrieve the username of the logged-in user
-        conn = get_db_connection()
-        user = conn.execute('SELECT username FROM users WHERE id = ?', (author_id,)).fetchone()
-        conn.close()
-        if user is None:
-            flash('User not found.')
-            return redirect(url_for('submit'))
-
-        username = user['username']  # Username of the logged-in user
+        # Determine the username
+        if 'user_id' in session:
+            # Get username from database for local authenticated users
+            conn = get_db_connection()
+            user = conn.execute('SELECT username FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+            conn.close()
+            if user is None:
+                flash('User not found.')
+                return redirect(url_for('submit'))
+            username = user['username']
+        else:
+            # Assign a default username for Google-authenticated users
+            username = "Google_User"
 
         if 'image' in request.files:
             file = request.files['image']
@@ -487,22 +491,19 @@ def login_with_google():
 
 @app.route('/callback')
 def callback():
-    # Get authorization code Google sent back
     code = request.args.get("code")
-
     if not code:
         flash("Authorization code not found", category="error")
         return redirect(url_for("login"))
+
     try:
-        # Find out what URL to hit to get tokens
         google_provider_cfg = requests.get(GOOGLE_DISCOVERY_URL).json()
         token_endpoint = google_provider_cfg["token_endpoint"]
 
-        # Prepare and send a request to get tokens
         token_url, headers, body = oauth2_client.prepare_token_request(
             token_endpoint,
             authorization_response=request.url,
-            redirect_url=REDIRECT_URI,  # Use the constant REDIRECT_URI here
+            redirect_url=REDIRECT_URI,
             code=code
         )
         token_response = requests.post(
@@ -512,46 +513,16 @@ def callback():
             auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
         )
 
-        # Parse the tokens
         tokens = token_response.json()
         oauth2_client.parse_request_body_response(json.dumps(tokens))
 
-        # Now that you have tokens, get the user's profile information
-        userinfo_endpoint = google_provider_cfg["userinfo_endpoint"]
-        uri, headers, body = oauth2_client.add_token(userinfo_endpoint)
-        userinfo_response = requests.get(uri, headers=headers, data=body)
-
-        if userinfo_response.json().get("email_verified"):
-            user_info = userinfo_response.json()
-            users_email = user_info["email"]
-
-            # Check if user with this email already exists in your database
-            conn = get_db_connection()
-            user = conn.execute('SELECT * FROM users WHERE username = ?', (users_email,)).fetchone()
-            conn.close()
-
-            if user:
-                # Authenticate the user without creating an account
-                # Set a temporary user ID or another identifier, e.g., email
-                session['user_email'] = users_email
-                # Set the session variables from the Google OAuth response
-                session['access_token'] = tokens.get('access_token')
-                session['refresh_token'] = tokens.get('refresh_token')
-                session['expires_at'] = tokens.get('expires_at')
-                flash('Logged in successfully!', category="success")
-                return redirect(url_for('index'))
-        else:
-            flash('User email not available or not verified by Google.', category="error")
-            return redirect(url_for('login'))
+        session['logged_in_with_google'] = True
+        session['access_token'] = tokens.get('access_token')
+        flash('Logged in successfully with Google!', category="success")
+        return redirect(url_for('index'))
     except Exception as e:
         flash(f"An error occurred: {e}", category="error")
         return redirect(url_for("login"))
-    except Exception as e:
-        flash(f"An error occurred: {e}", category="error")
-        return redirect(url_for("login"))
-
-
-
 
 
 # Error handlers
@@ -560,6 +531,6 @@ def too_many_requests(e):
     return render_template('429.html'), 429
 
 
-
+# API routes for the blog
 if __name__ == '__main__':
     app.run(debug=True)

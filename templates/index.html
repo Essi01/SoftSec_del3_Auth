@@ -15,15 +15,15 @@
             <nav>
                 <ul>
                     <!-- Conditionally render login/register or logout -->
-                    {% if 'user_id' in session %}
-                        <li class="logout">
-                            <form action="{{ url_for('logout') }}" method="post">
-                                <input type="submit" value="Logout">
-                            </form>
-                        </li>
-                    {% else %}
-                        <li><a href="{{ url_for('login') }}">Login</a></li>
-                        <li><a href="{{ url_for('register') }}">Register</a></li>
+                    {% if 'user_id' in session or 'logged_in_with_google' in session %}
+                <li class="logout">
+                    <form action="{{ url_for('logout') }}" method="post">
+                        <input type="submit" value="Logout">
+                    </form>
+                </li>
+            {% else %}
+                <li><a href="{{ url_for('login') }}">Login</a></li>
+                <li><a href="{{ url_for('register') }}">Register</a></li>
                     {% endif %}
                 </ul>
             </nav>
