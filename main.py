@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet
 import base64
 from oauthlib.oauth2 import WebApplicationClient
 import json
+import re
 
 
 
@@ -303,6 +304,7 @@ def update_failed_login_counters(username, ip_address, failed_login_key, totp_fa
 
         # Record the lockout in the user_lockouts dictionary
 
+
         # Optionally, record the lockout in another structure keyed by username
         # This can be useful for tracking lockouts across different sessions or IP addresses
         user_lockouts[username] = current_time + lockout_duration
@@ -338,13 +340,25 @@ def logout():
 
 
 @app.route('/register', methods=['GET', 'POST'])
-# @limiter.limit("2 per minute")
+@limiter.limit("4 per minute")
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password'].encode('utf-8')
-        hashed_password = bcrypt.hashpw(password, bcrypt.gensalt())
+        password = request.form['password']
+
+        # password validation
+        if (len(password) < 8 or
+                not re.search("[0-9]", password) or
+                not re.search("[!@#$%^&*]", password) or
+                not re.search("[a-z]", password) or
+                not re.search("[A-Z]", password)):
+            flash(
+                'Password must be at least 8 characters long, include a number, a special character, an uppercase letter, and a lowercase letter.')
+            return redirect(url_for('register'))
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         totp_secret = generate_totp_secret()
+
 
         # Create a TOTP object and generate a URI for QR code
         totp_uri = get_totp_uri(totp_secret, username)
@@ -358,22 +372,29 @@ def register():
         conn = None  # Initialize conn to None
         try:
             conn = get_db_connection()
+
+            # Check if username already exists
+            existing_user = conn.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+            if existing_user:
+                flash('Username already taken, please choose another one.')
+                return redirect(url_for('register'))
+
+            # Proceed with registration since username is unique
             conn.execute('INSERT INTO users (username, password, totp_secret) VALUES (?, ?, ?)',
                          (username, hashed_password, totp_secret))
             conn.commit()
+
             # After successful registration, display the QR code for the user to scan
             session['username_for_qr'] = username  # Save the username in session to be used in the QR code route
             return redirect(url_for('show_qr_code'))  # Updated line
-        except sqlite3.IntegrityError:
-            flash('Username already taken')
-            return redirect(url_for('register'))
+
         except sqlite3.DatabaseError as e:
             flash('Database error: ' + str(e))
             return redirect(url_for('register'))
         finally:
             if conn:
                 conn.close()
-    return render_template('register.html', CLIENT_ID=GOOGLE_CLIENT_ID, REDIRECT_URI=REDIRECT_URI)
+    return render_template('register.html')
 
 
 @app.route('/show-qr-code')

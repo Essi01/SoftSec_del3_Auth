@@ -30,14 +30,35 @@
     </header>
     <main>
         <div class="container">
+            <! -- Display flashed message username taken -->
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <ul class="flashes">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
+
             <form action="{{ url_for('register') }}" method="post">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
                 <button type="submit">Register</button>
+
+                 <!-- Display Password Requirements -->
+              <div class="password-requirements">
+                    <p>Password must be at least 8 characters long and include:</p>
+                    <ul>
+                        <li>At least one number</li>
+                        <li>At least one special character (!@#$%^&*)</li>
+                        <li>At least one uppercase letter</li>
+                        <li>At least one lowercase letter</li>
+                    </ul>
+                </div>
             </form>
-            </div>
         </div>
     </main>
     <footer>
