@@ -18,14 +18,16 @@ import base64
 from oauthlib.oauth2 import WebApplicationClient
 import json
 import re
-
+from flask import current_app
 
 
 # OAuth2 Configuration redirect URI
 REDIRECT_URI = "http://127.0.0.1:5000/callback"
 
+
 # Set environment variables for testing with HTTP
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'   # DO NOT USE IN PRODUCTION
+
 
 # Function to generate a Fernet key
 def load_key():
@@ -42,6 +44,8 @@ def load_key():
 encryption_key = load_key()
 fernet = Fernet(encryption_key)
 
+
+# Test encryption and decryption
 def test_encryption():
     # Use a known secret for testing
     test_secret = pyotp.random_base32()
@@ -59,9 +63,9 @@ def test_encryption():
     assert test_secret == decrypted_secret, "The decrypted secret does not match the original"
 
 
-
 # Set timezone for Oslo, Norway
 local_tz = pytz.timezone('Europe/Oslo')
+
 
 # Function to get the current time in local timezone
 def get_current_time():
@@ -82,6 +86,7 @@ def get_totp_uri(secret, username):
     return totp.provisioning_uri(username, issuer_name="TechSavvy")
 
 
+# Function to get the TOTP secret for a user
 def get_totp_secret_for_user(username):
     # Get database connection
     conn = get_db_connection()
@@ -180,7 +185,6 @@ def init_db():
 init_db()
 
 
-
 # Initialize Flask-Limiter without the app object
 limiter = Limiter(
     key_func=get_remote_address,
@@ -188,10 +192,12 @@ limiter = Limiter(
 )
 limiter.init_app(app)
 
+
 # Create a dictionary to track banned IPs
 BANNED_IPS = {}
 
 
+# Register a function to run before each request
 @app.before_request
 def check_ban_status():
     ip_address = get_remote_address()
@@ -209,6 +215,7 @@ def check_ban_status():
             del BANNED_IPS[ip_address]
 
 
+# Check if the IP is in the failed login attempts list
 @app.errorhandler(429)
 def ratelimit_handler():
     ip_address = get_remote_address()
@@ -223,6 +230,8 @@ failed_logins_by_ip = {}  # Format: {'ip_address': (last_attempt_time, count)}
 # Global dictionary to track user lockouts
 user_lockouts = {}
 
+
+# Login route
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def login():
@@ -282,6 +291,7 @@ def login():
     return render_template('login.html', CLIENT_ID=GOOGLE_CLIENT_ID, REDIRECT_URI=REDIRECT_URI)
 
 
+# Function to update failed login counters
 def update_failed_login_counters(username, ip_address, failed_login_key, totp_failed_key, lockout_key):
     current_time = datetime.now(local_tz)
 
@@ -304,21 +314,25 @@ def update_failed_login_counters(username, ip_address, failed_login_key, totp_fa
 
         # Record the lockout in the user_lockouts dictionary
 
-
         # Optionally, record the lockout in another structure keyed by username
         # This can be useful for tracking lockouts across different sessions or IP addresses
         user_lockouts[username] = current_time + lockout_duration
 
 
+# Function to validate a TOTP token
 def validate_totp(totp_token, totp_secret):
     totp = pyotp.TOTP(totp_secret)
     return totp.verify(totp_token)
 
+
+# Function to get the TOTP secret for a user
 def inform_lockout(lockout_time):
     lockout_remaining = int((lockout_time - datetime.now()).total_seconds())
     flash(f'Account locked for {lockout_remaining} seconds.')
     return render_template('login.html')
 
+
+# Function to get the TOTP secret for a user
 def update_lockout_counter(lockout_key):
     failed_attempts = session.get(lockout_key, 0) + 1
     if failed_attempts >= 3:
@@ -326,11 +340,14 @@ def update_lockout_counter(lockout_key):
     session[lockout_key] = failed_attempts
     return None
 
+
+# Function to get the TOTP secret for a user
 def validate_totp(totp_token, totp_secret):
     totp = pyotp.TOTP(totp_secret)
     return totp.verify(totp_token)
 
 
+# Logout route
 @app.route('/logout', methods=['POST'])
 def logout():
     # Clear the entire session
@@ -339,6 +356,7 @@ def logout():
     return redirect(url_for('index'))
 
 
+# Register route
 @app.route('/register', methods=['GET', 'POST'])
 @limiter.limit("4 per minute")
 def register():
@@ -353,12 +371,12 @@ def register():
                 not re.search("[a-z]", password) or
                 not re.search("[A-Z]", password)):
             flash(
-                'Password must be at least 8 characters long, include a number, a special character, an uppercase letter, and a lowercase letter.')
+                'Password must be at least 8 characters long, include a number, a special character,'
+                ' an uppercase letter, and a lowercase letter.')
             return redirect(url_for('register'))
 
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         totp_secret = generate_totp_secret()
-
 
         # Create a TOTP object and generate a URI for QR code
         totp_uri = get_totp_uri(totp_secret, username)
@@ -397,6 +415,7 @@ def register():
     return render_template('register.html')
 
 
+# Route to display the QR code
 @app.route('/show-qr-code')
 def show_qr_code():
     username = session.pop('username_for_qr', None)
@@ -419,7 +438,7 @@ def show_qr_code():
     return render_template('qr_code.html', qr_code_data=qr_code_data)
 
 
-
+# Protected resource route for testing the OAuth2 flow with Google (not used in the blog)
 @app.route("/protected_resource")
 def protected_resource():
     # Use the access token to access a protected resource
@@ -434,6 +453,8 @@ def protected_resource():
     response = requests.get('https://oauth_provider.com/resource', headers=headers)
     return response.content
 
+
+# The main route of the application
 @app.route('/')
 def index():
     conn = get_db_connection()
@@ -443,6 +464,8 @@ def index():
     articles = response.json().get('articles', [])[:4]
     return render_template('index.html', posts=posts, articles=articles)
 
+
+# Post route to create a new post in the database
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
     # Check if logged in with local auth or Google OAuth
@@ -498,13 +521,14 @@ def submit():
     return render_template('submit.html')
 
 
-from flask import current_app
+# Route to display a single post
 @app.route('/show_templates')
 def show_templates():
     return str(current_app.jinja_loader.list_templates())
 
-# OAuth functions for the OAuth2
 
+# OAuth functions for the OAuth2
+# Login route for the OAuth2 flow with Google
 @app.route('/login_with_google')
 def login_with_google():
     try:
@@ -540,7 +564,7 @@ def login_with_google():
         return redirect(url_for("index"))
 
 
-
+# Callback route for the OAuth2 flow
 @app.route('/callback')
 def callback():
     code = request.args.get("code")
@@ -579,7 +603,7 @@ def callback():
 
 # Error handlers
 @app.errorhandler(429)
-def too_many_requests(e):
+def too_many_requests():
     return render_template('429.html'), 429
 
 
