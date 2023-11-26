@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 # from redis import Redis  # Uncomment if Redis is used
@@ -19,11 +19,12 @@ from oauthlib.oauth2 import WebApplicationClient
 import json
 
 
+
 # OAuth2 Configuration redirect URI
 REDIRECT_URI = "http://127.0.0.1:5000/callback"
 
 # Set environment variables for testing with HTTP
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # DO NOT USE IN PRODUCTION
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'   # DO NOT USE IN PRODUCTION
 
 # Function to generate a Fernet key
 def load_key():
@@ -34,6 +35,7 @@ def load_key():
         return key
     except FileNotFoundError:
         raise RuntimeError("Fernet key file not found. Please generate a key.")
+
 
 # Load the Fernet key
 encryption_key = load_key()
@@ -64,12 +66,14 @@ local_tz = pytz.timezone('Europe/Oslo')
 def get_current_time():
     return datetime.now(local_tz)
 
+
 # Function to generate a TOTP secret
 def generate_totp_secret():
     secret = pyotp.random_base32()
     # Encrypt the TOTP secret before storing it
     encrypted_secret = fernet.encrypt(secret.encode())
     return encrypted_secret
+
 
 # Function to generate a TOTP URI
 def get_totp_uri(secret, username):
@@ -135,9 +139,11 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 # Check if file extension is allowed
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 # Initialize the database
 def init_db():
@@ -161,7 +167,8 @@ def init_db():
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
                 client_id TEXT,
-                client_secret TEXT
+                client_secret TEXT,
+                totp_secret TEXTE
             );
         ''')
         db.commit()
@@ -182,7 +189,6 @@ limiter.init_app(app)
 
 # Create a dictionary to track banned IPs
 BANNED_IPS = {}
-
 
 
 @app.before_request
@@ -323,7 +329,6 @@ def validate_totp(totp_token, totp_secret):
     return totp.verify(totp_token)
 
 
-
 @app.route('/logout', methods=['POST'])
 def logout():
     # Clear the entire session
@@ -333,7 +338,7 @@ def logout():
 
 
 @app.route('/register', methods=['GET', 'POST'])
-@limiter.limit("2 per minute")
+# @limiter.limit("2 per minute")
 def register():
     if request.method == 'POST':
         username = request.form['username']
@@ -350,6 +355,7 @@ def register():
         img.save(img_stream)
         img_stream.seek(0)
 
+        conn = None  # Initialize conn to None
         try:
             conn = get_db_connection()
             conn.execute('INSERT INTO users (username, password, totp_secret) VALUES (?, ?, ?)',
@@ -368,7 +374,6 @@ def register():
             if conn:
                 conn.close()
     return render_template('register.html', CLIENT_ID=GOOGLE_CLIENT_ID, REDIRECT_URI=REDIRECT_URI)
-
 
 
 @app.route('/show-qr-code')
@@ -472,21 +477,47 @@ def submit():
     return render_template('submit.html')
 
 
+from flask import current_app
+@app.route('/show_templates')
+def show_templates():
+    return str(current_app.jinja_loader.list_templates())
 
 # OAuth functions for the OAuth2
 
 @app.route('/login_with_google')
 def login_with_google():
-    google_provider_cfg = requests.get(GOOGLE_DISCOVERY_URL).json()
-    authorization_endpoint = google_provider_cfg["authorization_endpoint"]
+    try:
+        # Fetch the Google provider configuration
+        google_provider_cfg = requests.get(GOOGLE_DISCOVERY_URL).json()
+        authorization_endpoint = google_provider_cfg.get("authorization_endpoint")
 
-    # Construct the request for Google login
-    request_uri = oauth2_client.prepare_request_uri(
-        authorization_endpoint,
-        redirect_uri=REDIRECT_URI,  # Use the constant defined at the beginning
-        scope=["openid", "email", "profile"],
-    )
-    return redirect(request_uri)
+        # Check if the authorization endpoint is correctly fetched
+        if not authorization_endpoint:
+            raise ValueError("Failed to fetch authorization endpoint from Google provider configuration.")
+
+        # Debug print (remove in production)
+        print(f"Authorization Endpoint: {authorization_endpoint}")
+
+        # Construct the request for Google login
+        request_uri = oauth2_client.prepare_request_uri(
+            authorization_endpoint,
+            redirect_uri=REDIRECT_URI,  # Use the constant defined at the beginning
+            scope=["openid", "email", "profile"],
+        )
+
+        # Debug print (remove in production)
+        print(f"Request URI: {request_uri}")
+
+        # Redirect to the Google login page
+        return redirect(request_uri)
+    except Exception as e:
+        # Log the exception (print for debugging, consider logging in production)
+        print(f"An error occurred in login_with_google: {e}")
+
+        # Handle the error appropriately (e.g., display an error message)
+        flash("An error occurred while trying to authenticate with Google. Please try again later.")
+        return redirect(url_for("index"))
+
 
 
 @app.route('/callback')
