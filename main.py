@@ -219,7 +219,7 @@ def check_ban_status():
 @app.errorhandler(429)
 def ratelimit_handler():
     ip_address = get_remote_address()
-    ban_duration = timedelta(minutes=30)  # Set the desired ban duration
+    ban_duration = timedelta(minutes=30)  # Set the desired ban duration here (30 minutes is set)
     BANNED_IPS[ip_address] = datetime.now() + ban_duration
     return make_response(render_template('429.html'), 429)
 
@@ -603,7 +603,7 @@ def callback():
 
 # Error handlers
 @app.errorhandler(429)
-def too_many_requests():
+def too_many_requests(e):
     return render_template('429.html'), 429
 
 
