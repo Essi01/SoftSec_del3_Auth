@@ -172,8 +172,6 @@ def init_db():
                 id INTEGER PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
-                client_id TEXT,
-                client_secret TEXT,
                 totp_secret TEXT
             );
         ''')
@@ -547,7 +545,7 @@ def login_with_google():
         request_uri = oauth2_client.prepare_request_uri(
             authorization_endpoint,
             redirect_uri=REDIRECT_URI,  # Use the constant defined at the beginning
-            scope=["openid", "email", "profile"],
+            scope=["openid", "email", "profile"], # Specify the required and optional scopes that your app will request from the user
         )
 
         # Debug print (remove in production)
@@ -609,4 +607,4 @@ def too_many_requests(e):
 
 # API routes for the blog
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')

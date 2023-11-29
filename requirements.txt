@@ -1,0 +1,16 @@
+requests~=2.31.0
+pytz~=2023.3.post1
+bcrypt~=4.0.1
+pyotp~=2.9.0
+qrcode~=7.4.2
+django-qrcode~=0.3
+flask~=3.0.0
+DateTime~=5.2
+werkzeug~=3.0.1
+Pillow~=10.1.0
+cryptography~=41.0.5
+oauthlib~=3.2.2
+flask_limiter
+
+
+
