@@ -174,7 +174,7 @@ def init_db():
                 password TEXT NOT NULL,
                 client_id TEXT,
                 client_secret TEXT,
-                totp_secret TEXTE
+                totp_secret TEXT
             );
         ''')
         db.commit()
